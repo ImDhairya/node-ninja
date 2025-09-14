@@ -1,6 +1,6 @@
 import db from "../db/index.js";
 import {eq} from "drizzle-orm";
-import {usersTable} from "../db/schema.js";
+import {userSession, usersTable} from "../db/schema.js";
 import {createHmac, randomBytes} from "node:crypto";
 
 export const getUserController = async function (req, res) {
@@ -8,6 +8,37 @@ export const getUserController = async function (req, res) {
   return res.status(200).json({
     message: "Hello this is users get route",
     allUsers,
+  });
+};
+
+export const sessionRequest = async function (req, res) {
+  const user = req.user;
+
+  return res.json(user);
+};
+
+export const updateUser = async function (req, res) {
+  const {name, email, password} = req.body;
+
+  const user = req.user;
+  if (!user) {
+    return res.status(403).json({
+      message: "Unauthorized user ",
+    });
+  }
+  if (!name || !email || !password) {
+    return res.status(401).json({
+      message: "Bad request here.",
+    });
+  }
+
+  await db
+    .update(usersTable)
+    .set({name, email, password})
+    .where(eq(usersTable.id, user.userId));
+
+  return res.status(291).json({
+    message: " Thu name is updated",
   });
 };
 
@@ -66,6 +97,7 @@ export const loginController = async function (req, res) {
     .select({
       email: usersTable.email,
       password: usersTable.password,
+      id: usersTable.id,
       salt: usersTable.salt,
     })
     .from(usersTable)
@@ -90,8 +122,15 @@ export const loginController = async function (req, res) {
     });
   }
 
+  const [session] = await db
+    .insert(userSession)
+    .values({
+      userId: userData.id,
+    })
+    .returning({id: userSession.id});
   return res.status(202).json({
     message: "User credentials fetched successfully.",
     userData,
+    session,
   });
 };
